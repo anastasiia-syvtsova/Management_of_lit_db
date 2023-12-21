@@ -1,0 +1,217 @@
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
+
+plugins {
+    id 'java'
+    id 'application'
+	id 'idea'
+}
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+	jaxbtools
+}
+
+def jaxbversion = '2.3.2'
+
+dependencies {
+    implementation group: 'org.glassfish.jaxb', name: 'jaxb-runtime', version: '2.3.2'
+    jaxbtools group: 'com.sun.xml.bind', name: 'jaxb-ri', version: jaxbversion, ext: 'zip'
+    
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.3.1'
+    testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.3.1'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+run {
+    standardInput = System.in
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/main/java']
+        }
+        resources {
+            srcDirs = ['src/main/resources']
+        }
+    }
+    test {
+    	java {
+    		srcDirs = ['src/test/java']
+    	}
+    	resources {
+    		srcDirs = ['src/test/resources']
+    	}
+    }
+}
+
+task preparejaxb {
+	def jaxbhome = file("$buildDir/jaxb/$jaxbversion")
+	outputs.dir(jaxbhome)
+    doFirst {
+   		def zipPath = jaxbhome.toPath()
+   		Files.createDirectories(zipPath)
+   		// get jaxb zip bundle from configuration and copy to build/jaxb/$jaxbversion
+   		configurations.jaxbtools.files.each { 
+   			if (it.toPath().getFileName().toString().endsWith(".zip")) {
+   				zipPath = zipPath.resolve(it.toPath().getFileName()); 
+   				Files.copy(it.toPath(), zipPath, StandardCopyOption.REPLACE_EXISTING); 
+   			}
+   		}
+   		// unzip bundle into folder named like the zip but without file ending
+   		def unzipPath = zipPath.getFileName().toString().replaceFirst("[.][^.]+\$", "")
+   		copy {
+   			from zipTree(zipPath.toFile().toString())
+   			into Path.of("$jaxbhome/$unzipPath").toString()
+   		}
+    }
+}
+
+task schemagen(group: "JAXB tools", description: "generate a schema from java sources") {
+    dependsOn 'preparejaxb'
+    dependsOn 'compileJava'
+	doLast{
+		// check for provided argument
+		if (!project.hasProperty('srcRootClass')) {
+			throw new GradleException('srcRootClass not provided, please provide the path to the source code of the XmlRootElement class: \"schemagen -PsrcRootClass=\"src/main/java/mypackage/MyRootElement.java" "')
+		}
+		// find jaxb directory in build directory
+		def jaxbhome
+		preparejaxb.outputs.getFiles().each {
+			if (it.isDirectory()) {
+				//must be the jaxbhome directory
+				jaxbhome = it
+			}
+		}
+		// search for /bin directory inside jaxbhome and store in binDir
+		def binDir
+		fileTree(jaxbhome).visit {
+			FileVisitDetails -> if (FileVisitDetails.isDirectory() && FileVisitDetails.getName() == 'bin') {binDir = FileVisitDetails.getFile()}
+		}
+		// determine execution environment
+		def isBash = true
+		def out = new ByteArrayOutputStream()
+		try {
+			// test if gradle is executed inside bash -> uname only works in bash
+			exec {
+				commandLine 'sh', '-c', 'uname'
+				standardOutput = out
+				ignoreExitValue = true
+			}
+			println 'detected: ' + out
+			// prints the bash description: "Darwin" -> Mac, "Linux" -> Linux, "MINGW32_NT" -> windows with bash, "MINGW64_NT" -> windows with bash
+			// see https://stackoverflow.com/questions/3466166/how-to-check-if-running-in-cygwin-mac-or-linux
+		} catch (Exception e) {
+			// must be windows
+			isBash = false
+		}
+		// prepare schemagen tool call
+		def schemagencall
+		def schemadest = Path.of("$buildDir/schema")
+		Files.createDirectories(schemadest)
+		// clean folder if necessary
+		fileTree(schemadest).visit {
+			FileVisitDetails -> delete FileVisitDetails.getFile()
+		}
+		def schemadestparam = schemadest.toString()
+		def classpathparam = file("$buildDir/classes/java/main").toString()
+		def schemagenoptions
+		if (isBash) {
+            // for bash make sure / is used only in the paths and escape potential spaces with "\ "
+			schemagencall = binDir.toPath().resolve("schemagen.sh").toAbsolutePath().toString().replace("\\", "/").replace(" ", "\\ ")
+			schemagenoptions = "-d " + schemadestparam.replace("\\", "/").replace(" ", "\\ ") + " -cp " + classpathparam.replace("\\", "/").replace(" ", "\\ ")
+		} else {
+            // for windows command line make sure \ is used only in the paths and escape potential spaces with "^ "
+			schemagencall = binDir.toPath().resolve("schemagen.bat").toAbsolutePath().toString().replace(" ", "^ ")
+			schemagenoptions = "-d " + schemadestparam.replace(" ", "^ ") + " -cp " + classpathparam.replace(" ", "^ ")
+		}
+
+		// execute schemagen tool call via command line
+		exec {
+			if (isBash) {
+				commandLine 'sh', '-c', schemagencall + " " + schemagenoptions + " " + srcRootClass
+			} else {
+				commandLine 'cmd', '/c', schemagencall + " " + schemagenoptions + " " + srcRootClass
+			}
+		}
+		// copy created schema(s) to $projectDir
+		fileTree(schemadest).visit {
+			FileVisitDetails -> if (FileVisitDetails.getName().endsWith(".xsd")) {FileVisitDetails.copyTo(file("$projectDir/" + FileVisitDetails.getName()))}
+		}
+	}
+}
+
+task xjc(group: "JAXB tools", description: "generate java sources from a schema") {
+    dependsOn 'preparejaxb'
+	doLast{
+		// check for provided argument
+		if (!project.hasProperty('schemaLocation')) {
+			throw new GradleException('schemaLocation not provided, please provide the path to the file/dir/jar with the schema information: \"xjc -PschemaLocation=\"./schema1.xsd" "')
+		}
+		// find jaxb directory in build directory
+		def jaxbhome
+		preparejaxb.outputs.getFiles().each {
+			if (it.isDirectory()) {
+				//must be the jaxbhome directory
+				jaxbhome = it
+			}
+		}
+		// search for /bin directory inside jaxbhome and store in binDir
+		def binDir
+		fileTree(jaxbhome).visit {
+			FileVisitDetails -> if (FileVisitDetails.isDirectory() && FileVisitDetails.getName() == 'bin') {binDir = FileVisitDetails.getFile()}
+		}
+		// determine execution environment
+		def isBash = true
+		def out = new ByteArrayOutputStream()
+		try {
+			// test if gradle is executed inside bash -> uname only works in bash
+			exec {
+				commandLine 'sh', '-c', 'uname'
+				standardOutput = out
+				ignoreExitValue = true
+			}
+			println 'detected: ' + out
+			// prints the bash description: "Darwin" -> Mac, "Linux" -> Linux, "MINGW32_NT" -> windows with bash, "MINGW64_NT" -> windows with bash
+			// see https://stackoverflow.com/questions/3466166/how-to-check-if-running-in-cygwin-mac-or-linux
+		} catch (Exception e) {
+			// must be windows
+			isBash = false
+		}
+		// prepare xjc tool call
+		def xjccall
+		def srcdest = file("$projectDir/src/xjc")
+		srcdest.mkdirs()
+		def srcdestparam = srcdest.toString()
+		def xjcoptions
+		if (isBash) {
+            // for bash make sure / is used only in the paths and escape potential spaces with "\ "
+			xjccall = binDir.toPath().resolve("xjc.sh").toAbsolutePath().toString().replace("\\", "/").replace(" ", "\\ ")
+			xjcoptions = "-d " + srcdestparam.replace("\\", "/").replace(" ", "\\ ")
+		} else {
+            // for windows command line make sure \ is used only in the paths and escape potential spaces with "^ "
+			xjccall = binDir.toPath().resolve("xjc.bat").toAbsolutePath().toString().replace(" ", "^ ")
+			xjcoptions = "-d " + srcdestparam.replace(" ", "^ ")
+		}
+
+		// execute xjc tool call via command line
+		exec {
+			if (isBash) {
+				commandLine 'sh', '-c', xjccall + " " + xjcoptions + " " + schemaLocation
+			} else {
+				commandLine 'cmd', '/c', xjccall + " " + xjcoptions + " " + schemaLocation
+			}
+		}
+	}
+}
+
+// Define the main class for the application
+mainClassName = 'de.uniba.wiai.dsg.ajp.assignment2.literature.Main'

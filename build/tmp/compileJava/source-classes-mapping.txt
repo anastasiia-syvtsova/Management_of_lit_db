@@ -1,0 +1,30 @@
+de/uniba/wiai/dsg/ajp/assignment2/literature/ui/ConsoleHelper.java
+ de.uniba.wiai.dsg.ajp.assignment2.literature.ui.ConsoleHelper
+de/uniba/wiai/dsg/ajp/assignment2/literature/logic/DatabaseService.java
+ de.uniba.wiai.dsg.ajp.assignment2.literature.logic.DatabaseService
+de/uniba/wiai/dsg/ajp/assignment2/literature/ui/SubMenu.java
+ de.uniba.wiai.dsg.ajp.assignment2.literature.ui.SubMenu
+de/uniba/wiai/dsg/ajp/assignment2/literature/ui/ExtendedConsoleHelper.java
+ de.uniba.wiai.dsg.ajp.assignment2.literature.ui.ExtendedConsoleHelper
+de/uniba/wiai/dsg/ajp/assignment2/literature/logic/model/Author.java
+ de.uniba.wiai.dsg.ajp.assignment2.literature.logic.model.Author
+de/uniba/wiai/dsg/ajp/assignment2/literature/logic/impl/MainServiceImpl.java
+ de.uniba.wiai.dsg.ajp.assignment2.literature.logic.impl.MainServiceImpl
+de/uniba/wiai/dsg/ajp/assignment2/literature/logic/impl/DatabaseServiceImpl.java
+ de.uniba.wiai.dsg.ajp.assignment2.literature.logic.impl.DatabaseServiceImpl
+de/uniba/wiai/dsg/ajp/assignment2/literature/logic/model/Database.java
+ de.uniba.wiai.dsg.ajp.assignment2.literature.logic.model.Database
+de/uniba/wiai/dsg/ajp/assignment2/literature/logic/LiteratureDatabaseException.java
+ de.uniba.wiai.dsg.ajp.assignment2.literature.logic.LiteratureDatabaseException
+de/uniba/wiai/dsg/ajp/assignment2/literature/logic/MainService.java
+ de.uniba.wiai.dsg.ajp.assignment2.literature.logic.MainService
+de/uniba/wiai/dsg/ajp/assignment2/literature/ui/MainMenu.java
+ de.uniba.wiai.dsg.ajp.assignment2.literature.ui.MainMenu
+de/uniba/wiai/dsg/ajp/assignment2/literature/logic/ValidationHelper.java
+ de.uniba.wiai.dsg.ajp.assignment2.literature.logic.ValidationHelper
+de/uniba/wiai/dsg/ajp/assignment2/literature/Main.java
+ de.uniba.wiai.dsg.ajp.assignment2.literature.Main
+de/uniba/wiai/dsg/ajp/assignment2/literature/logic/model/Publication.java
+ de.uniba.wiai.dsg.ajp.assignment2.literature.logic.model.Publication
+de/uniba/wiai/dsg/ajp/assignment2/literature/logic/model/PublicationType.java
+ de.uniba.wiai.dsg.ajp.assignment2.literature.logic.model.PublicationType
